@@ -25,7 +25,9 @@ class PurchaseRequestLine(models.Model):
         comodel_name="uom.uom",
         string="UoM",
         tracking=True,
+        domain="[('category_id', '=', product_uom_category_id)]",
     )
+    product_uom_category_id = fields.Many2one(related="product_id.uom_id.category_id")
     product_qty = fields.Float(
         string="Quantity", tracking=True, digits="Product Unit of Measure"
     )
@@ -296,11 +298,39 @@ class PurchaseRequestLine(models.Model):
 
     def do_cancel(self):
         """Actions to perform when cancelling a purchase request line."""
+        # Changing the procure method, since related moves should pick
+        # goods from stock after request lines are cancelled.
+        self._set_dest_move_as_mts()
         self.write({"cancelled": True})
 
     def do_uncancel(self):
         """Actions to perform when uncancelling a purchase request line."""
+        self._set_dest_move_as_mto()
         self.write({"cancelled": False})
+
+    def _set_dest_move_as_mto(self):
+        """Sets related moves as `make_to_order`.
+
+        This should be called when a purchase line is cancelled or rejected,
+        so the related moves won't wait for this purchase request to be done.
+        """
+        dest_moves = self.move_dest_ids.filtered(
+            lambda m: m.state not in ["done", "cancel"]
+        )
+        dest_moves.write({"procure_method": "make_to_order"})
+        dest_moves._recompute_state()
+
+    def _set_dest_move_as_mts(self):
+        """Sets related moves as `make_to_stock`.
+
+        This should be called when a PRL is reset, so related moves will
+        wait back for it to be processed, instead of picking goods from stock.
+        """
+        dest_moves = self.move_dest_ids.filtered(
+            lambda m: m.state not in ["done", "cancel"]
+        )
+        dest_moves.write({"procure_method": "make_to_stock"})
+        dest_moves._recompute_state()
 
     def write(self, vals):
         res = super(PurchaseRequestLine, self).write(vals)
@@ -371,14 +401,8 @@ class PurchaseRequestLine(models.Model):
 
         rl_qty = 0.0
         # Recompute quantity by adding existing running procurements.
-        if new_pr_line:
-            rl_qty = po_line.product_uom_qty
-        else:
-            for prl in po_line.purchase_request_lines:
-                for alloc in prl.purchase_request_allocation_ids:
-                    rl_qty += alloc.product_uom_id._compute_quantity(
-                        alloc.requested_product_uom_qty, purchase_uom
-                    )
+        for rl in po_line.purchase_request_lines:
+            rl_qty += rl.product_uom_id._compute_quantity(rl.product_qty, purchase_uom)
         qty = max(rl_qty, supplierinfo_min_qty)
         return qty
 

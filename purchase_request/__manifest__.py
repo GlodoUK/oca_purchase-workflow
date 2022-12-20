@@ -4,7 +4,7 @@
 {
     "name": "Purchase Request",
     "author": "ForgeFlow, Odoo Community Association (OCA)",
-    "version": "14.0.1.3.5",
+    "version": "14.0.2.0.0",
     "summary": "Use this module to have notification of requirements of "
     "materials and/or external services and keep track of such "
     "requirements.",
@@ -23,6 +23,7 @@
         "views/purchase_request_report.xml",
         "views/product_template.xml",
         "views/purchase_order_view.xml",
+        "views/res_config_settings.xml",
         "views/stock_move_views.xml",
         "views/stock_picking_views.xml",
     ],
