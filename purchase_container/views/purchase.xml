@@ -6,7 +6,6 @@
         <field name="arch" type="xml">
             <xpath expr="//group[@name='invoice_info']" position="after">
                 <group>
-                    <field name="state" />
                     <field name="container_ids" readonly="state != 'draft'">
                         <list edit="0">
                             <field name="name" />
